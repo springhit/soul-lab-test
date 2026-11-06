@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>前世人物志 · 验证码管理台</title>
+<style>
+  * { -webkit-tap-highlight-color: transparent; }
+  body { margin:0; background:#f4f1fa; font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+    color:#3d3470; padding:18px 14px 60px; }
+  .wrap { max-width:760px; margin:0 auto; }
+  h1 { font-size:20px; margin:0 0 4px; letter-spacing:1px; }
+  .sub { font-size:12.5px; color:#8d84ad; margin:0 0 18px; line-height:1.9; }
+  .card { background:#fff; border-radius:18px; padding:20px 18px; margin-bottom:14px;
+    box-shadow:0 6px 20px rgba(93,73,180,.08); }
+  .stats { display:flex; gap:10px; margin-bottom:14px; }
+  .stat { flex:1; background:linear-gradient(160deg,#5a49b8,#7a6bd6); color:#fff; border-radius:14px;
+    padding:14px 10px; text-align:center; }
+  .stat b { display:block; font-size:24px; line-height:1.3; }
+  .stat span { font-size:11px; opacity:.85; }
+  label { display:block; font-size:13px; font-weight:600; color:#5a4f80; margin:14px 0 8px; }
+  input[type=number], input[type=text], textarea {
+    width:100%; box-sizing:border-box; padding:13px 14px; border-radius:12px; border:1.5px solid #ded7f0;
+    background:#faf8ff; font-size:15px; color:#3d3470; outline:none; font-family:inherit; }
+  input:focus, textarea:focus { border-color:#7a6bd6; background:#fff; }
+  .btn { display:block; width:100%; box-sizing:border-box; border:none; border-radius:14px; padding:15px;
+    font-size:15.5px; font-weight:700; letter-spacing:1px; cursor:pointer; font-family:inherit; margin-top:16px; }
+  .btn-main { background:linear-gradient(135deg,#5a49b8,#8a7ae0); color:#fff; box-shadow:0 6px 16px rgba(90,73,184,.28); }
+  .btn-ghost { background:#f0ecfa; color:#5a49b8; }
+  .btn-sm { padding:9px 14px; font-size:13px; border-radius:10px; width:auto; display:inline-block; margin:0 8px 8px 0; }
+  .code { font-family:ui-monospace,Menlo,Consolas,monospace; font-weight:700; letter-spacing:1.5px;
+    color:#5a49b8; font-size:15px; }
+  .row { display:flex; align-items:center; justify-content:space-between; padding:11px 0;
+    border-bottom:1px dashed #ece7f8; gap:10px; }
+  .row:last-child { border-bottom:none; }
+  .note { font-size:11.5px; color:#9d94b8; margin-top:2px; }
+  .tag { font-size:10.5px; padding:3px 8px; border-radius:20px; background:#eef7ef; color:#3f9e5a; white-space:nowrap; }
+  .tag.used { background:#f3f0fb; color:#a99ec9; }
+  .hint { font-size:11.5px; color:#a79dc6; line-height:1.9; margin-top:12px; }
+  .warn { background:#fff8e6; border-radius:12px; padding:12px 14px; font-size:12.5px; color:#8a6d1f; line-height:1.9; }
+  .fresh { background:#f7f5ff; border-radius:14px; padding:14px; margin-top:14px; }
+  .fresh .code { font-size:18px; }
+  textarea { min-height:110px; font-family:ui-monospace,Menlo,Consolas,monospace; font-size:12px; }
+  .empty { text-align:center; color:#b3a6c9; font-size:13px; padding:24px 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>验证码管理台</h1>
+  <p class="sub">生成一次性验证码 · 导出码库文件 · 上传到 GitHub 后即可发码收人</p>
+
+  <div class="stats">
+    <div class="stat"><b id="stTotal">0</b><span>已生成</span></div>
+    <div class="stat"><b id="stUsed">0</b><span>本机已用</span></div>
+    <div class="stat"><b id="stLeft">0</b><span>余量</span></div>
+  </div>
+
+  <div class="card">
+    <label>生成数量</label>
+    <input type="number" id="count" value="5" min="1" max="200">
+    <label>备注（可选，帮你记住发给谁）</label>
+    <input type="text" id="note" placeholder="例如：小红书 3 月客户">
+    <button class="btn btn-main" id="btnGen">生 成 验 证 码</button>
+    <div id="freshBox"></div>
+    <p class="hint">验证码只在本机显示明文，导出文件里存的是加密指纹，别人看到源码也拿不到可用码。</p>
+  </div>
+
+  <div class="card">
+    <label style="margin-top:0;">码库列表</label>
+    <div id="list"><div class="empty">还没有生成验证码</div></div>
+    <div style="margin-top:16px;">
+      <button class="btn btn-ghost btn-sm" id="btnCopyAll">复制全部可用码</button>
+      <button class="btn btn-ghost btn-sm" id="btnExport">下载 codes.js</button>
+      <button class="btn btn-ghost btn-sm" id="btnImport">导入已有 codes.js</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="warn">
+      <b>使用步骤</b><br>
+      1. 点「下载 codes.js」<br>
+      2. 把 codes.js 和 index.html 一起上传到你的 GitHub 仓库<br>
+      3. 打开 GitHub Pages 设置，生成网址<br>
+      4. 把「网址 + 验证码」发给对方<br>
+      5. 对方答完 16 题，该码立即在本机失效
+    </div>
+    <p class="hint">
+      注：纯静态网页没有服务器，「是否已使用」记录在答题者自己的浏览器里。<br>
+      同一台设备无法重复使用，换设备理论上可再用一次——如需绝对防重，请用 README 里的云端加固方案。
+    </p>
+  </div>
+
+  <div class="card" id="importCard" style="display:none;">
+    <label style="margin-top:0;">粘贴 codes.js 内容</label>
+    <textarea id="importArea" placeholder="window.__CODES__ = { salt: &quot;...&quot;, codes: [ ... ] };"></textarea>
+    <button class="btn btn-main" id="btnDoImport">导 入</button>
+    <button class="btn btn-ghost" id="btnCancelImport" style="margin-top:10px;">取消</button>
+  </div>
+</div>
+
+<script>
+(function(){
+  var LS = "qsz_admin_codes_v1";
+  var CHARS = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ"; // 去掉易混淆的 0 O 1 I
+
+  function store(){
+    try { return JSON.parse(localStorage.getItem(LS) || "null") || { salt:null, items:[] }; }
+    catch(e){ return { salt:null, items:[] }; }
+  }
+  function save(s){ try { localStorage.setItem(LS, JSON.stringify(s)); } catch(e){} }
+
+  function randSalt(){
+    var s = "", arr = new Uint8Array(16);
+    if(window.crypto && crypto.getRandomValues) crypto.getRandomValues(arr);
+    else for(var i=0;i<16;i++) arr[i] = Math.floor(Math.random()*256);
+    for(var j=0;j<16;j++) s += ("0"+arr[j].toString(16)).slice(-2);
+    return s;
+  }
+
+  function genCode(){
+    var out = "", arr = new Uint8Array(8);
+    if(window.crypto && crypto.getRandomValues) crypto.getRandomValues(arr);
+    else for(var i=0;i<8;i++) arr[i] = Math.floor(Math.random()*256);
+    for(var j=0;j<8;j++) out += CHARS[arr[j] % 32];
+    return "QS-" + out.slice(0,4) + "-" + out.slice(4);
+  }
+  function normCode(v){ return String(v||"").toUpperCase().replace(/[^0-9A-Z]/g,""); }
+
+  /* 与测试页完全一致的 SHA-256 */
+  function sha256hex(msg){
+    function rr(x,n){ return (x>>>n) | (x<<(32-n)); }
+    var K = [0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,
+             0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,
+             0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,
+             0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,
+             0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,
+             0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,
+             0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,
+             0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2];
+    var H = [0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19];
+    var bytes = [], i, c;
+    for(i=0;i<msg.length;i++){
+      c = msg.charCodeAt(i);
+      if(c < 0x80) bytes.push(c);
+      else if(c < 0x800){ bytes.push(0xc0|(c>>6), 0x80|(c&63)); }
+      else if(c < 0xd800 || c >= 0xe000){ bytes.push(0xe0|(c>>12), 0x80|((c>>6)&63), 0x80|(c&63)); }
+      else {
+        i++; c = 0x10000 + (((c&0x3ff)<<10) | (msg.charCodeAt(i)&0x3ff));
+        bytes.push(0xf0|(c>>18), 0x80|((c>>12)&63), 0x80|((c>>6)&63), 0x80|(c&63));
+      }
+    }
+    var bitLen = bytes.length * 8;
+    bytes.push(0x80);
+    while(bytes.length % 64 !== 56) bytes.push(0);
+    bytes.push(0,0,0,0);
+    bytes.push((bitLen>>>24)&255, (bitLen>>>16)&255, (bitLen>>>8)&255, bitLen&255);
+    var w = new Array(64), a,b,c2,d,e,f,g,hh,t1,t2,S0,S1,ch,maj;
+    for(var off=0; off<bytes.length; off+=64){
+      for(var t=0;t<16;t++){
+        w[t] = (bytes[off+t*4]<<24) | (bytes[off+t*4+1]<<16) | (bytes[off+t*4+2]<<8) | bytes[off+t*4+3];
+      }
+      for(var tt=16;tt<64;tt++){
+        var x1 = w[tt-15], x2 = w[tt-2];
+        S0 = rr(x1,7) ^ rr(x1,18) ^ (x1>>>3);
+        S1 = rr(x2,17) ^ rr(x2,19) ^ (x2>>>10);
+        w[tt] = (w[tt-16] + S0 + w[tt-7] + S1) | 0;
+      }
+      a=H[0];b=H[1];c2=H[2];d=H[3];e=H[4];f=H[5];g=H[6];hh=H[7];
+      for(var t3=0;t3<64;t3++){
+        S1 = rr(e,6)^rr(e,11)^rr(e,25);
+        ch = (e&f) ^ ((~e)&g);
+        t1 = (hh + S1 + ch + K[t3] + w[t3]) | 0;
+        S0 = rr(a,2)^rr(a,13)^rr(a,22);
+        maj = (a&b) ^ (a&c2) ^ (b&c2);
+        t2 = (S0 + maj) | 0;
+        hh=g; g=f; f=e; e=(d+t1)|0; d=c2; c2=b; b=a; a=(t1+t2)|0;
+      }
+      H[0]=(H[0]+a)|0; H[1]=(H[1]+b)|0; H[2]=(H[2]+c2)|0; H[3]=(H[3]+d)|0;
+      H[4]=(H[4]+e)|0; H[5]=(H[5]+f)|0; H[6]=(H[6]+g)|0; H[7]=(H[7]+hh)|0;
+    }
+    var out = "";
+    for(var k2=0;k2<8;k2++) out += ("00000000" + (H[k2]>>>0).toString(16)).slice(-8);
+    return out;
+  }
+
+  function hashOf(salt, code){
+    return sha256hex(salt + "|" + normCode(code)).slice(0,16);
+  }
+
+  function usedMap(){
+    try { return JSON.parse(localStorage.getItem("qsz_used_codes_v1") || "{}"); }
+    catch(e){ return {}; }
+  }
+
+  function render(){
+    var s = store();
+    var used = usedMap();
+    document.getElementById("stTotal").textContent = s.items.length;
+    var usedN = s.items.filter(function(it){ return used[it.h]; }).length;
+    document.getElementById("stUsed").textContent = usedN;
+    document.getElementById("stLeft").textContent = s.items.length - usedN;
+
+    var box = document.getElementById("list");
+    if(!s.items.length){ box.innerHTML = '<div class="empty">还没有生成验证码</div>'; return; }
+    var rows = s.items.slice().reverse().map(function(it){
+      var isUsed = !!used[it.h];
+      return '<div class="row">' +
+        '<div>' +
+          '<div class="code">' + (it.code || "（仅存指纹 " + it.h.slice(0,8) + "）") + '</div>' +
+          '<div class="note">' + (it.note ? it.note + " · " : "") + (it.code ? it.h.slice(0,8) : it.h.slice(0,16)) + '</div>' +
+        '</div>' +
+        '<div style="text-align:right;">' +
+          '<span class="tag ' + (isUsed ? "used" : "") + '">' + (isUsed ? "本机已用" : "可用") + '</span>' +
+          (it.code ? '<div style="margin-top:6px;"><button class="btn btn-ghost btn-sm" data-copy="' + it.code + '">复制</button></div>' : '') +
+        '</div>' +
+      '</div>';
+    }).join("");
+    box.innerHTML = rows;
+    var cbs = box.querySelectorAll("[data-copy]");
+    for(var i=0;i<cbs.length;i++){
+      cbs[i].addEventListener("click", function(){
+        copyText(this.getAttribute("data-copy"));
+        var b = this, old = b.textContent;
+        b.textContent = "已复制"; setTimeout(function(){ b.textContent = old; }, 1200);
+      });
+    }
+  }
+
+  function copyText(t){
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(t).catch(function(){ fallbackCopy(t); });
+    } else fallbackCopy(t);
+  }
+  function fallbackCopy(t){
+    var ta = document.createElement("textarea");
+    ta.value = t; ta.style.position="fixed"; ta.style.opacity="0";
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand("copy"); } catch(e){}
+    document.body.removeChild(ta);
+  }
+
+  document.getElementById("btnGen").addEventListener("click", function(){
+    var s = store();
+    if(!s.salt) s.salt = randSalt();
+    var n = parseInt(document.getElementById("count").value, 10) || 1;
+    n = Math.max(1, Math.min(200, n));
+    var noteBase = document.getElementById("note").value.trim();
+    var fresh = [];
+    for(var i=0;i<n;i++){
+      var code = genCode();
+      var h = hashOf(s.salt, code);
+      var note = noteBase ? (n > 1 ? noteBase + " #" + (i+1) : noteBase) : "";
+      s.items.push({ code: code, h: h, note: note, at: Date.now() });
+      fresh.push({ code: code, note: note });
+    }
+    save(s);
+    var box = document.getElementById("freshBox");
+    box.innerHTML = '<div class="fresh"><div style="font-size:12.5px;color:#8d84ad;margin-bottom:10px;">' +
+      '刚生成 ' + n + ' 个验证码（务必现在保存好）</div>' +
+      fresh.map(function(f){
+        return '<div class="row"><div><div class="code">' + f.code + '</div>' +
+          (f.note ? '<div class="note">' + f.note + '</div>' : '') + '</div></div>';
+      }).join("") + '</div>';
+    render();
+  });
+
+  document.getElementById("btnCopyAll").addEventListener("click", function(){
+    var s = store(), used = usedMap();
+    var lines = s.items.filter(function(it){ return it.code && !used[it.h]; })
+      .map(function(it){ return (it.note ? it.note + "\t" : "") + it.code; });
+    if(!lines.length){ alert("没有可用的验证码"); return; }
+    copyText(lines.join("\n"));
+    alert("已复制 " + lines.length + " 个可用验证码");
+  });
+
+  document.getElementById("btnExport").addEventListener("click", function(){
+    var s = store();
+    if(!s.items.length){ alert("还没有生成验证码"); return; }
+    if(!s.salt) s.salt = randSalt();
+    var payload = {
+      salt: s.salt,
+      codes: s.items.map(function(it){ return { h: it.h, note: it.note || "", used: false }; })
+    };
+    var content = "/* 前世人物志 · 验证码库\n   由管理台自动生成，请勿手工修改\n   生成时间：" +
+      new Date().toLocaleString("zh-CN") + "\n   共 " + payload.codes.length + " 个验证码 */\n" +
+      "window.__CODES__ = " + JSON.stringify(payload, null, 2) + ";\n";
+    var blob = new Blob([content], { type: "text/javascript;charset=utf-8" });
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "codes.js";
+    document.body.appendChild(a); a.click();
+    setTimeout(function(){ document.body.removeChild(a); URL.revokeObjectURL(a.href); }, 400);
+  });
+
+  document.getElementById("btnImport").addEventListener("click", function(){
+    document.getElementById("importCard").style.display = "block";
+    document.getElementById("importCard").scrollIntoView({ behavior:"smooth" });
+  });
+  document.getElementById("btnCancelImport").addEventListener("click", function(){
+    document.getElementById("importCard").style.display = "none";
+  });
+  document.getElementById("btnDoImport").addEventListener("click", function(){
+    var txt = document.getElementById("importArea").value;
+    var m = txt.match(/\{[\s\S]*\}/);
+    if(!m){ alert("没找到有效的 codes.js 内容"); return; }
+    var data;
+    try { data = JSON.parse(m[0]); } catch(e){ alert("格式解析失败，请确认是完整的 codes.js"); return; }
+    if(!data.salt || !data.codes){ alert("缺少 salt 或 codes 字段"); return; }
+    var s = store();
+    if(s.items.length && !confirm("当前已有 " + s.items.length + " 个码，导入会覆盖它们，继续吗？")) return;
+    s.salt = data.salt;
+    s.items = data.codes.map(function(c){ return { code:"", h:c.h, note:c.note||"", at:0 }; });
+    save(s); render();
+    alert("已导入 " + s.items.length + " 个码（只含指纹，旧码明文无法恢复，但依然可用）");
+    document.getElementById("importCard").style.display = "none";
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>
